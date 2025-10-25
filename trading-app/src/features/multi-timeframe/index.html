@@ -15,7 +15,8 @@
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
         background: #0a0e27;
         color: #fff;
-        overflow: auto;
+        overflow-y: auto;
+        overflow-x: hidden;
       }
 
       .header {
@@ -37,7 +38,7 @@
         gap: 12px;
       }
 
-      .back-btn {
+      .back-btn, .add-chart-btn {
         display: flex;
         align-items: center;
         gap: 6px;
@@ -53,10 +54,21 @@
         transition: all 0.2s ease;
       }
 
-      .back-btn:hover {
+      .back-btn:hover, .add-chart-btn:hover {
         background: #2a2e39;
         color: #fff;
         border-color: #2962ff;
+      }
+
+      .add-chart-btn {
+        background: #2962ff;
+        color: #fff;
+        border-color: #2962ff;
+      }
+
+      .add-chart-btn:hover {
+        background: #1e53e5;
+        border-color: #1e53e5;
       }
 
       .title h1 {
@@ -226,11 +238,23 @@
       }
 
       .charts-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 8px;
-        padding: 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 10px;
         min-height: calc(100vh - 60px);
+        max-width: 100vw;
+        overflow-x: hidden;
+        box-sizing: border-box;
+      }
+
+      .chart-wrapper {
+        position: relative;
+        min-width: 300px;
+        width: calc(25% - 8px);
+        flex-shrink: 0;
+        resize: both;
+        overflow: auto;
       }
 
       .chart-container {
@@ -241,7 +265,15 @@
         display: flex;
         flex-direction: column;
         position: relative;
+        transition: box-shadow 0.2s ease;
+        width: 100%;
+        height: 100%;
         min-height: 400px;
+      }
+
+      .chart-container:hover {
+        border-color: #2962ff;
+        box-shadow: 0 0 0 1px #2962ff;
       }
 
       .chart-header {
@@ -251,14 +283,45 @@
         justify-content: space-between;
         align-items: center;
         border-bottom: 1px solid #2a2e39;
+        gap: 10px;
       }
 
-      .chart-title {
-        font-size: 14px;
-        font-weight: 600;
+      .chart-title-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: 1;
+      }
+
+      .chart-timeframe-select {
+        background: #131722;
         color: #2962ff;
+        border: 1px solid #2a2e39;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        outline: none;
+        transition: all 0.2s ease;
         text-transform: uppercase;
         letter-spacing: 0.5px;
+      }
+
+      .chart-timeframe-select:hover {
+        border-color: #2962ff;
+        background: #1e222d;
+      }
+
+      .chart-timeframe-select:focus {
+        border-color: #2962ff;
+        box-shadow: 0 0 0 2px rgba(41, 98, 255, 0.2);
+      }
+
+      .chart-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
       }
 
       .chart-price {
@@ -274,19 +337,63 @@
         color: #ef5350;
       }
 
+      .chart-delete-btn {
+        background: transparent;
+        border: none;
+        color: #787b86;
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+      }
+
+      .chart-delete-btn:hover {
+        background: rgba(239, 83, 80, 0.2);
+        color: #ef5350;
+      }
+
       .chart-content {
         flex: 1;
         position: relative;
-        min-height: 350px;
+        overflow: hidden;
+        width: 100%;
+        min-height: 300px;
       }
 
-      .chart-loading {
+      .chart-resize-handle {
         position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 12px;
-        color: #787b86;
+        bottom: 4px;
+        right: 4px;
+        width: 24px;
+        height: 24px;
+        cursor: nwse-resize;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(41, 98, 255, 0.1);
+        border-radius: 4px;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        z-index: 10;
+        border: 1px solid rgba(41, 98, 255, 0.3);
+      }
+
+      .chart-wrapper:hover .chart-resize-handle {
+        opacity: 1;
+      }
+
+      .chart-resize-handle svg {
+        color: #2962ff;
+        width: 16px;
+        height: 16px;
+      }
+
+      .chart-resize-handle:hover {
+        background: rgba(41, 98, 255, 0.2);
+        border-color: #2962ff;
       }
 
       .error-message {
@@ -304,28 +411,134 @@
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
       }
 
+      /* Modal for adding charts */
+      .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      }
+
+      .modal-overlay.active {
+        display: flex;
+      }
+
+      .modal {
+        background: #131722;
+        border-radius: 12px;
+        border: 1px solid #2a2e39;
+        padding: 24px;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      }
+
+      .modal-header {
+        font-size: 18px;
+        font-weight: 600;
+        color: #fff;
+        margin-bottom: 20px;
+      }
+
+      .modal-body {
+        margin-bottom: 20px;
+      }
+
+      .timeframe-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+
+      .timeframe-option {
+        background: #1e222d;
+        border: 1px solid #2a2e39;
+        padding: 12px;
+        border-radius: 6px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 13px;
+        font-weight: 600;
+        color: #d1d4dc;
+      }
+
+      .timeframe-option:hover {
+        border-color: #2962ff;
+        background: #2a2e39;
+      }
+
+      .timeframe-option.selected {
+        background: #2962ff;
+        border-color: #2962ff;
+        color: #fff;
+      }
+
+      .modal-footer {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+      }
+
+      .modal-btn {
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid #2a2e39;
+        transition: all 0.2s ease;
+      }
+
+      .modal-btn-primary {
+        background: #2962ff;
+        color: #fff;
+        border-color: #2962ff;
+      }
+
+      .modal-btn-primary:hover {
+        background: #1e53e5;
+      }
+
+      .modal-btn-secondary {
+        background: transparent;
+        color: #787b86;
+      }
+
+      .modal-btn-secondary:hover {
+        background: #2a2e39;
+        color: #fff;
+      }
+
       /* Responsive layouts */
       @media (max-width: 1920px) {
-        .charts-grid {
-          grid-template-columns: repeat(4, 1fr);
+        .chart-wrapper {
+          width: calc(25% - 8px);
         }
       }
 
       @media (max-width: 1600px) {
-        .charts-grid {
-          grid-template-columns: repeat(3, 1fr);
+        .chart-wrapper {
+          width: calc(33.333% - 8px);
         }
       }
 
       @media (max-width: 1200px) {
-        .charts-grid {
-          grid-template-columns: repeat(2, 1fr);
+        .chart-wrapper {
+          width: calc(50% - 8px);
         }
       }
 
       @media (max-width: 768px) {
-        .charts-grid {
-          grid-template-columns: 1fr;
+        .chart-wrapper {
+          width: 100%;
+          min-width: 100%;
         }
         
         .title h1 {
@@ -334,6 +547,10 @@
 
         .current-price {
           font-size: 16px;
+        }
+
+        .timeframe-grid {
+          grid-template-columns: repeat(2, 1fr);
         }
       }
     </style>
@@ -354,6 +571,12 @@
         </div>
       </div>
       <div class="controls">
+        <button class="add-chart-btn" id="addChartBtn">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span>Add Chart</span>
+        </button>
         <button class="toggle-swing-btn active" id="toggleSwingBtn">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M2 8L6 4M6 4L10 8M6 4V12M14 8L10 12M10 12L6 8M10 12V4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -398,83 +621,20 @@
     
     <div class="charts-grid" id="chartsGrid">
       <!-- Charts will be dynamically created here -->
-      <div class="chart-container">
-        <div class="chart-header">
-          <span class="chart-title">1 Minute</span>
-          <span class="chart-price" id="price-1m">--</span>
-        </div>
-        <div class="chart-content" id="chart-1m">
-          <div class="chart-loading">Loading...</div>
-        </div>
-      </div>
+    </div>
 
-      <div class="chart-container">
-        <div class="chart-header">
-          <span class="chart-title">5 Minutes</span>
-          <span class="chart-price" id="price-5m">--</span>
+    <!-- Add Chart Modal -->
+    <div class="modal-overlay" id="addChartModal">
+      <div class="modal">
+        <div class="modal-header">Add New Chart</div>
+        <div class="modal-body">
+          <div class="timeframe-grid" id="timeframeGrid">
+            <!-- Timeframe options will be populated here -->
+          </div>
         </div>
-        <div class="chart-content" id="chart-5m">
-          <div class="chart-loading">Loading...</div>
-        </div>
-      </div>
-
-      <div class="chart-container">
-        <div class="chart-header">
-          <span class="chart-title">15 Minutes</span>
-          <span class="chart-price" id="price-15m">--</span>
-        </div>
-        <div class="chart-content" id="chart-15m">
-          <div class="chart-loading">Loading...</div>
-        </div>
-      </div>
-
-      <div class="chart-container">
-        <div class="chart-header">
-          <span class="chart-title">30 Minutes</span>
-          <span class="chart-price" id="price-30m">--</span>
-        </div>
-        <div class="chart-content" id="chart-30m">
-          <div class="chart-loading">Loading...</div>
-        </div>
-      </div>
-
-      <div class="chart-container">
-        <div class="chart-header">
-          <span class="chart-title">1 Hour</span>
-          <span class="chart-price" id="price-1h">--</span>
-        </div>
-        <div class="chart-content" id="chart-1h">
-          <div class="chart-loading">Loading...</div>
-        </div>
-      </div>
-
-      <div class="chart-container">
-        <div class="chart-header">
-          <span class="chart-title">4 Hours</span>
-          <span class="chart-price" id="price-4h">--</span>
-        </div>
-        <div class="chart-content" id="chart-4h">
-          <div class="chart-loading">Loading...</div>
-        </div>
-      </div>
-
-      <div class="chart-container">
-        <div class="chart-header">
-          <span class="chart-title">Daily</span>
-          <span class="chart-price" id="price-1d">--</span>
-        </div>
-        <div class="chart-content" id="chart-1d">
-          <div class="chart-loading">Loading...</div>
-        </div>
-      </div>
-
-      <div class="chart-container">
-        <div class="chart-header">
-          <span class="chart-title">Weekly</span>
-          <span class="chart-price" id="price-1w">--</span>
-        </div>
-        <div class="chart-content" id="chart-1w">
-          <div class="chart-loading">Loading...</div>
+        <div class="modal-footer">
+          <button class="modal-btn modal-btn-secondary" id="modalCancelBtn">Cancel</button>
+          <button class="modal-btn modal-btn-primary" id="modalAddBtn">Add Chart</button>
         </div>
       </div>
     </div>
