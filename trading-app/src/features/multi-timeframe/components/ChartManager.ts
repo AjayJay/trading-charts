@@ -3,7 +3,6 @@ import { GridState, TimeframeConfig, ChartLayout } from "../types";
 import {
 	AVAILABLE_TIMEFRAMES,
 	DEFAULT_TIMEFRAMES,
-	MIN_CHART_HEIGHT,
 	DEFAULT_CHART_HEIGHT,
 } from "../constants";
 import { saveGridState, loadGridState } from "../utils/storage";
@@ -17,6 +16,7 @@ export class ChartManager {
 	private nextChartId: number = 1;
 	private swingStructureEnabled: boolean = true;
 	private comparisonPeriod: number = 5;
+	private forwardPeriod: number = 5;
 	private lookbackPeriod: number = 200;
 	private observers: Map<string, ResizeObserver> = new Map();
 	private eventListeners: Map<string, Array<{ element: HTMLElement; type: string; handler: EventListener }>> = new Map();
@@ -64,6 +64,21 @@ export class ChartManager {
 	private async loadFromState(state: GridState): Promise<void> {
 		const sortedCharts = state.charts.sort((a, b) => a.order - b.order);
 
+		// FIX: Extract max chart number from saved IDs to prevent ID collision
+		// e.g., "chart-5" → 5, then set nextChartId to 6
+		const maxChartNum = sortedCharts.reduce((max, layout) => {
+			const match = layout.id.match(/chart-(\d+)/);
+			if (match) {
+				const num = parseInt(match[1], 10);
+				return Math.max(max, num);
+			}
+			return max;
+		}, 0);
+		
+		// Set nextChartId to one more than the highest existing ID
+		this.nextChartId = maxChartNum + 1;
+		console.log(`Loaded ${sortedCharts.length} charts, nextChartId set to ${this.nextChartId}`);
+
 		const promises = sortedCharts.map(async (layout) => {
 			const timeframe = AVAILABLE_TIMEFRAMES.find(
 				(tf) => tf.id === layout.timeframeId
@@ -92,50 +107,88 @@ export class ChartManager {
 	): Promise<string> {
 		const chartId = id || `chart-${this.nextChartId++}`;
 
-		// Create container element and append to DOM
-		const containerEl = this.createChartContainer(chartId, timeframe, width, height);
-		this.gridContainer.appendChild(containerEl);
+		// FIX: Wrap entire operation in try-catch to cleanup on failure
+		let containerEl: HTMLElement | null = null;
+		let chart: TimeframeChart | null = null;
+		let chartAddedToMap = false;
 
-		// CRITICAL: Wait for browser to layout flexbox items before creating chart
-		// This ensures the container has proper dimensions when TimeframeChart constructor runs
-		await new Promise(resolve => setTimeout(resolve, 100));
-
-		// Create chart instance (constructor will set initial size)
-		const chart = new TimeframeChart(
-			chartId,
-			timeframe,
-			width,
-			height || DEFAULT_CHART_HEIGHT
-		);
-
-		// Set callbacks
-		chart.onDelete((id) => this.removeChart(id));
-
-		// Apply current settings
-		chart.updateSettings({
-			swingStructureEnabled: this.swingStructureEnabled,
-			comparisonPeriod: this.comparisonPeriod,
-			lookbackPeriod: this.lookbackPeriod,
-		});
-
-		// Store chart in map BEFORE loading data
-		this.charts.set(chartId, chart);
-
-		// Load data FIRST, then setup resize observer
-		// This prevents resize observer from firing during initial data load
 		try {
+			// Create container element (without event listeners yet)
+			containerEl = this.createChartContainer(chartId, timeframe, width, height);
+			
+			// FIX Issue #5: Append to DOM BEFORE attaching event listeners
+			// This ensures event listeners are attached to elements in the DOM
+			this.gridContainer.appendChild(containerEl);
+			
+			// Now attach event listeners to DOM-connected elements
+			this.attachChartEventListeners(containerEl, chartId);
+
+			// CRITICAL: Wait for browser to layout flexbox items before creating chart
+			// This ensures the container has proper dimensions when TimeframeChart constructor runs
+			await new Promise(resolve => setTimeout(resolve, 100));
+
+			// Create chart instance (constructor will set initial size)
+			chart = new TimeframeChart(
+				chartId,
+				timeframe,
+				width,
+				height || DEFAULT_CHART_HEIGHT
+			);
+
+			// FIX Issue #2: Add to map IMMEDIATELY after creation (before any async operations)
+			// This prevents race condition where delete is clicked before chart is in map
+			this.charts.set(chartId, chart);
+			chartAddedToMap = true;
+
+			// Set callbacks
+			chart.onDelete((id) => this.removeChart(id));
+
+			// Apply current settings
+			chart.updateSettings({
+				swingStructureEnabled: this.swingStructureEnabled,
+				comparisonPeriod: this.comparisonPeriod,
+				forwardPeriod: this.forwardPeriod,
+				lookbackPeriod: this.lookbackPeriod,
+			});
+
+			// Load data FIRST, then setup resize observer
+			// This prevents resize observer from firing during initial data load
 			await chart.loadData();
 			
 			// Setup resize observer AFTER data is loaded
 			this.setupResizeObserver(chartId);
+			
+			// Save state only after successful data load
+			this.saveState();
+			
+			console.log(`✓ Successfully added chart ${chartId}: ${timeframe.label}`);
+			return chartId;
+
 		} catch (error) {
-			console.error(`Failed to load chart ${chartId}:`, error);
+			// FIX: Cleanup on any failure (creation OR data load)
+			console.error(`Failed to add chart ${chartId} (${timeframe.label}):`, error);
+			
+			// Remove from map if it was added
+			if (chartAddedToMap && chart) {
+				this.charts.delete(chartId);
+			}
+			
+			// Destroy chart instance if created
+			if (chart) {
+				try {
+					chart.destroy();
+				} catch (e) {
+					console.warn('Error destroying chart during cleanup:', e);
+				}
+			}
+			
+			// Remove DOM element if created
+			if (containerEl && containerEl.parentNode) {
+				containerEl.remove();
+			}
+			
+			throw error;
 		}
-
-		// Save state
-		this.saveState();
-
-		return chartId;
 	}
 
 	/**
@@ -143,7 +196,10 @@ export class ChartManager {
 	 */
 	removeChart(id: string): void {
 		const chart = this.charts.get(id);
-		if (!chart) return;
+		if (!chart) {
+			console.warn(`Attempted to remove non-existent chart: ${id}`);
+			return;
+		}
 
 		// Cleanup ResizeObserver to prevent memory leak
 		const observer = this.observers.get(id);
@@ -164,12 +220,24 @@ export class ChartManager {
 		// Destroy chart instance
 		chart.destroy();
 
-		// Remove the WRAPPER element (the outer flex item that occupies space)
-		// getContainer() returns .chart-content
-		// .closest('.chart-wrapper') gets the outer wrapper
-		const wrapper = chart.getContainer().closest('.chart-wrapper');
-		if (wrapper) {
+		// FIX Issue #3: Ensure wrapper is ALWAYS removed, even if closest() fails
+		// Try multiple fallback methods to find and remove the wrapper
+		const chartContainer = chart.getContainer();
+		const wrapper = chartContainer.closest('.chart-wrapper') as HTMLElement;
+		
+		if (wrapper && wrapper.parentNode) {
 			wrapper.remove();
+		} else {
+			// Fallback: Try to find wrapper by searching for chart ID in data attribute
+			console.warn(`Direct wrapper removal failed for ${id}, trying fallback`);
+			const allWrappers = this.gridContainer.querySelectorAll('.chart-wrapper');
+			allWrappers.forEach((w) => {
+				const deleteBtn = w.querySelector(`[data-chart-id="${id}"]`);
+				if (deleteBtn && w.parentNode) {
+					w.remove();
+					console.log(`Removed wrapper using fallback method for ${id}`);
+				}
+			});
 		}
 
 		// Remove from map
@@ -216,6 +284,7 @@ export class ChartManager {
 	updateSettings(settings: {
 		swingStructureEnabled?: boolean;
 		comparisonPeriod?: number;
+		forwardPeriod?: number;
 		lookbackPeriod?: number;
 	}): void {
 		if (settings.swingStructureEnabled !== undefined) {
@@ -223,6 +292,9 @@ export class ChartManager {
 		}
 		if (settings.comparisonPeriod !== undefined) {
 			this.comparisonPeriod = settings.comparisonPeriod;
+		}
+		if (settings.forwardPeriod !== undefined) {
+			this.forwardPeriod = settings.forwardPeriod;
 		}
 		if (settings.lookbackPeriod !== undefined) {
 			this.lookbackPeriod = settings.lookbackPeriod;
@@ -235,7 +307,8 @@ export class ChartManager {
 	}
 
 	/**
-	 * Create chart container HTML
+	 * Create chart container HTML (without event listeners)
+	 * FIX Issue #5: Event listeners are attached separately after DOM append
 	 */
 	private createChartContainer(
 		chartId: string,
@@ -284,31 +357,41 @@ export class ChartManager {
 			</div>
 		`;
 
-		// Track event listeners for cleanup
+		return wrapper;
+	}
+
+	/**
+	 * Attach event listeners to chart container elements (after DOM append)
+	 * FIX Issue #5: Separated from createChartContainer to ensure listeners
+	 * are attached to elements that are already in the DOM
+	 */
+	private attachChartEventListeners(wrapper: HTMLElement, chartId: string): void {
 		const listeners: Array<{ element: HTMLElement; type: string; handler: EventListener }> = [];
 
 		// Add event listeners with tracking
 		const deleteBtn = wrapper.querySelector(
 			".chart-delete-btn"
 		) as HTMLButtonElement;
-		const deleteHandler = () => this.removeChart(chartId);
-		deleteBtn.addEventListener("click", deleteHandler);
-		listeners.push({ element: deleteBtn, type: 'click', handler: deleteHandler });
+		if (deleteBtn) {
+			const deleteHandler = () => this.removeChart(chartId);
+			deleteBtn.addEventListener("click", deleteHandler);
+			listeners.push({ element: deleteBtn, type: 'click', handler: deleteHandler });
+		}
 
 		const timeframeSelect = wrapper.querySelector(
 			".chart-timeframe-select"
 		) as HTMLSelectElement;
-		const timeframeHandler = (e: Event) => {
-			const target = e.target as HTMLSelectElement;
-			this.changeChartTimeframe(chartId, target.value);
-		};
-		timeframeSelect.addEventListener("change", timeframeHandler);
-		listeners.push({ element: timeframeSelect, type: 'change', handler: timeframeHandler });
+		if (timeframeSelect) {
+			const timeframeHandler = (e: Event) => {
+				const target = e.target as HTMLSelectElement;
+				this.changeChartTimeframe(chartId, target.value);
+			};
+			timeframeSelect.addEventListener("change", timeframeHandler);
+			listeners.push({ element: timeframeSelect, type: 'change', handler: timeframeHandler });
+		}
 
 		// Store listeners for cleanup later
 		this.eventListeners.set(chartId, listeners);
-
-		return wrapper;
 	}
 
 
@@ -325,22 +408,20 @@ export class ChartManager {
 
 		let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
 
-		const observer = new ResizeObserver((entries) => {
+		const observer = new ResizeObserver(() => {
 			if (resizeTimeout) clearTimeout(resizeTimeout);
 			
 			resizeTimeout = setTimeout(() => {
-				for (const entry of entries) {
-					const container = wrapper.querySelector(".chart-container") as HTMLElement;
-					
-					if (!container) return;
-					
-					// Calculate actual available space
-					const width = container.clientWidth - 2; // Subtract border
-					const height = container.clientHeight - 50; // Subtract header height
-					
-					if (width > 0 && height > 0) {
-						chart.resize(width, height);
-					}
+				const container = wrapper.querySelector(".chart-container") as HTMLElement;
+				
+				if (!container) return;
+				
+				// Calculate actual available space
+				const width = container.clientWidth - 2; // Subtract border
+				const height = container.clientHeight - 50; // Subtract header height
+				
+				if (width > 0 && height > 0) {
+					chart.resize(width, height);
 				}
 			}, 50); // Debounce resize
 		});
@@ -420,8 +501,42 @@ export class ChartManager {
 		return {
 			swingStructureEnabled: this.swingStructureEnabled,
 			comparisonPeriod: this.comparisonPeriod,
+			forwardPeriod: this.forwardPeriod,
 			lookbackPeriod: this.lookbackPeriod,
 		};
+	}
+
+	/**
+	 * Apply scale settings to all charts (TradingView-style)
+	 */
+	applyScaleSettings(settings: {
+		mode?: 'normal' | 'logarithmic' | 'percentage' | 'indexed';
+		position?: 'left' | 'right';
+		invertScale?: boolean;
+		autoScale?: boolean;
+		visible?: boolean;
+	}): void {
+		this.charts.forEach((chart) => {
+			chart.applyScaleSettings(settings);
+		});
+	}
+
+	/**
+	 * Auto-fit all charts
+	 */
+	autoFitAllCharts(): void {
+		this.charts.forEach((chart) => {
+			chart.autoFitContent();
+		});
+	}
+
+	/**
+	 * Reset price scale for all charts
+	 */
+	resetAllPriceScales(): void {
+		this.charts.forEach((chart) => {
+			chart.resetPriceScale();
+		});
 	}
 }
 

@@ -7,15 +7,16 @@ import { SwingPoint } from "../types";
 function isSwingHigh(
 	data: CandlestickData[],
 	index: number,
-	lookback: number
+	lookback: number,
+	forward: number
 ): boolean {
-	if (index < lookback || index >= data.length - lookback) {
+	if (index < lookback || index >= data.length - forward) {
 		return false;
 	}
 
 	const currentHigh = data[index].high;
 
-	for (let i = index - lookback; i <= index + lookback; i++) {
+	for (let i = index - lookback; i <= index + forward; i++) {
 		if (i !== index && data[i].high >= currentHigh) {
 			return false;
 		}
@@ -30,15 +31,16 @@ function isSwingHigh(
 function isSwingLow(
 	data: CandlestickData[],
 	index: number,
-	lookback: number
+	lookback: number,
+	forward: number
 ): boolean {
-	if (index < lookback || index >= data.length - lookback) {
+	if (index < lookback || index >= data.length - forward) {
 		return false;
 	}
 
 	const currentLow = data[index].low;
 
-	for (let i = index - lookback; i <= index + lookback; i++) {
+	for (let i = index - lookback; i <= index + forward; i++) {
 		if (i !== index && data[i].low <= currentLow) {
 			return false;
 		}
@@ -53,7 +55,8 @@ function isSwingLow(
 export function detectSwingPoints(
 	data: CandlestickData[],
 	lookback: number,
-	analyzePeriod: number
+	analyzePeriod: number,
+	forward: number = lookback
 ): SwingPoint[] {
 	const swingPoints: SwingPoint[] = [];
 
@@ -62,9 +65,9 @@ export function detectSwingPoints(
 	let previousSwingHigh: { price: number; index: number } | null = null;
 	let previousSwingLow: { price: number; index: number } | null = null;
 
-	for (let i = startIndex; i < data.length - lookback; i++) {
+	for (let i = startIndex; i < data.length - forward; i++) {
 		// Check for swing high
-		if (isSwingHigh(data, i, lookback)) {
+		if (isSwingHigh(data, i, lookback, forward)) {
 			const currentPrice = data[i].high;
 			let swingType: "HH" | "LH";
 
@@ -86,7 +89,7 @@ export function detectSwingPoints(
 		}
 
 		// Check for swing low
-		if (isSwingLow(data, i, lookback)) {
+		if (isSwingLow(data, i, lookback, forward)) {
 			const currentPrice = data[i].low;
 			let swingType: "HL" | "LL";
 

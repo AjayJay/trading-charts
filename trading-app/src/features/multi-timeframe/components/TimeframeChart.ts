@@ -45,15 +45,13 @@ export class TimeframeChart {
 	private containerElement: HTMLElement;
 	private swingStructureEnabled: boolean = true;
 	private comparisonPeriod: number = 5;
+	private forwardPeriod: number = 5;
 	private lookbackPeriod: number = 200;
 	private onDeleteCallback?: (id: string) => void;
-	private onTimeframeChangeCallback?: (
-		id: string,
-		timeframeId: string
-	) => void;
 	private retryCount: number = 0;
 	private maxRetries: number = 3;
 	private isDestroyed: boolean = false;
+	private isInitialLoad: boolean = true;
 
 	constructor(
 		containerId: string,
@@ -136,13 +134,14 @@ export class TimeframeChart {
 			height: chartHeight,
 		};
 
-		// Wait longer for flexbox layout to complete before adjusting to actual container size
+		// FIX: Reduced delay from 300ms to 150ms to minimize double-delay with ChartManager
+		// Combined with ChartManager's 100ms delay = 250ms total (was 400ms)
 		setTimeout(() => {
 			// Check if chart was destroyed during the delay
 			if (!this.isDestroyed) {
 				this.adjustToContainerSize();
 			}
-		}, 300);
+		}, 150);
 	}
 
 	/**
@@ -184,6 +183,19 @@ export class TimeframeChart {
 			return Promise.resolve();
 		}
 
+		// Save current visible range before loading new data (to preserve zoom)
+		let savedVisibleRange: { from: number; to: number } | null = null;
+		if (!this.isInitialLoad) {
+			try {
+				const visibleRange = this.chartInstance.chart.timeScale().getVisibleRange();
+				if (visibleRange) {
+					savedVisibleRange = { from: visibleRange.from as number, to: visibleRange.to as number };
+				}
+			} catch (e) {
+				// Ignore errors getting visible range
+			}
+		}
+
 		try {
 			const data = await fetchBTCData(
 				this.chartInstance.timeframe.interval,
@@ -205,7 +217,22 @@ export class TimeframeChart {
 
 			setTimeout(() => {
 				if (!this.isDestroyed) {
-					this.chartInstance.chart.timeScale().fitContent();
+					// Only fit content on initial load, otherwise restore zoom state
+					if (this.isInitialLoad) {
+						this.chartInstance.chart.timeScale().fitContent();
+						this.isInitialLoad = false;
+					} else if (savedVisibleRange) {
+						// Restore the previous zoom state
+						try {
+							this.chartInstance.chart.timeScale().setVisibleRange({
+								from: savedVisibleRange.from as any,
+								to: savedVisibleRange.to as any
+							});
+						} catch (e) {
+							// If restore fails, just keep current state
+							console.warn('Failed to restore zoom state:', e);
+						}
+					}
 				}
 			}, 100);
 
@@ -246,7 +273,10 @@ export class TimeframeChart {
 	 * Show error state in the chart UI
 	 */
 	private showErrorState(error: Error): void {
-		const priceElement = this.containerElement.querySelector(
+		// FIX: .chart-price is in .chart-header, not inside .chart-content
+		// Must search in the parent container (.chart-container)
+		const chartContainer = this.containerElement.closest('.chart-container');
+		const priceElement = chartContainer?.querySelector(
 			".chart-price"
 		) as HTMLElement;
 		if (priceElement) {
@@ -283,13 +313,14 @@ export class TimeframeChart {
 		}
 
 		const lookback = this.comparisonPeriod;
+		const forward = this.forwardPeriod;
 		const analyzePeriod = Math.min(this.lookbackPeriod, data.length);
 
-		if (data.length < lookback * 2 + 1) {
+		if (data.length < lookback + forward + 1) {
 			return;
 		}
 
-		const swingPoints = detectSwingPoints(data, lookback, analyzePeriod);
+		const swingPoints = detectSwingPoints(data, lookback, analyzePeriod, forward);
 		this.chartInstance.swingPoints = swingPoints;
 
 		const allPoints: LineData[] = swingPoints.map((point) => ({
@@ -312,7 +343,9 @@ export class TimeframeChart {
 	private updatePriceDisplay(data: CandlestickData[]): void {
 		if (data.length === 0) return;
 
-		const priceElement = this.containerElement.querySelector(
+		// FIX: .chart-price is in .chart-header, not inside .chart-content
+		const chartContainer = this.containerElement.closest('.chart-container');
+		const priceElement = chartContainer?.querySelector(
 			".chart-price"
 		) as HTMLElement;
 		if (!priceElement) return;
@@ -340,11 +373,83 @@ export class TimeframeChart {
 	}
 
 	/**
+	 * Apply scale settings (TradingView-style)
+	 */
+	applyScaleSettings(settings: {
+		mode?: 'normal' | 'logarithmic' | 'percentage' | 'indexed';
+		position?: 'left' | 'right';
+		invertScale?: boolean;
+		autoScale?: boolean;
+		visible?: boolean;
+	}): void {
+		const priceScaleOptions: any = {};
+
+		if (settings.mode !== undefined) {
+			priceScaleOptions.mode = settings.mode === 'logarithmic' ? 1 : 0;
+		}
+
+		if (settings.invertScale !== undefined) {
+			priceScaleOptions.invertScale = settings.invertScale;
+		}
+
+		if (settings.autoScale !== undefined) {
+			priceScaleOptions.autoScale = settings.autoScale;
+		}
+
+		if (settings.visible !== undefined) {
+			priceScaleOptions.visible = settings.visible;
+		}
+
+		// Apply to the appropriate price scale
+		if (settings.position === 'left') {
+			this.chartInstance.chart.applyOptions({
+				leftPriceScale: priceScaleOptions,
+				rightPriceScale: { visible: false },
+			});
+			// Move series to left scale
+			this.chartInstance.candleSeries.applyOptions({
+				priceScaleId: 'left',
+			});
+		} else {
+			this.chartInstance.chart.applyOptions({
+				rightPriceScale: priceScaleOptions,
+				leftPriceScale: { visible: false },
+			});
+			// Move series to right scale
+			this.chartInstance.candleSeries.applyOptions({
+				priceScaleId: 'right',
+			});
+		}
+	}
+
+	/**
+	 * Auto-fit chart content (TradingView's "Auto" button)
+	 */
+	autoFitContent(): void {
+		if (!this.isDestroyed) {
+			this.chartInstance.chart.timeScale().fitContent();
+		}
+	}
+
+	/**
+	 * Reset price scale (TradingView's "Reset" button)
+	 */
+	resetPriceScale(): void {
+		if (!this.isDestroyed) {
+			this.chartInstance.chart.priceScale('right').applyOptions({
+				autoScale: true,
+			});
+			this.chartInstance.chart.timeScale().resetTimeScale();
+		}
+	}
+
+	/**
 	 * Update settings
 	 */
 	updateSettings(settings: {
 		swingStructureEnabled?: boolean;
 		comparisonPeriod?: number;
+		forwardPeriod?: number;
 		lookbackPeriod?: number;
 	}): void {
 		if (settings.swingStructureEnabled !== undefined) {
@@ -352,6 +457,9 @@ export class TimeframeChart {
 		}
 		if (settings.comparisonPeriod !== undefined) {
 			this.comparisonPeriod = settings.comparisonPeriod;
+		}
+		if (settings.forwardPeriod !== undefined) {
+			this.forwardPeriod = settings.forwardPeriod;
 		}
 		if (settings.lookbackPeriod !== undefined) {
 			this.lookbackPeriod = settings.lookbackPeriod;
@@ -371,6 +479,9 @@ export class TimeframeChart {
 		
 		// Reset retry count when changing timeframe
 		this.retryCount = 0;
+		
+		// Reset to initial load so new timeframe fits content
+		this.isInitialLoad = true;
 		
 		this.chartInstance.timeframe = timeframe;
 		const titleElement = this.containerElement.querySelector(
@@ -412,13 +523,6 @@ export class TimeframeChart {
 	 */
 	onDelete(callback: (id: string) => void): void {
 		this.onDeleteCallback = callback;
-	}
-
-	/**
-	 * Set timeframe change callback
-	 */
-	onTimeframeChange(callback: (id: string, timeframeId: string) => void): void {
-		this.onTimeframeChangeCallback = callback;
 	}
 
 	/**

@@ -66,4 +66,29 @@ export const DEFAULT_CHART_HEIGHT = 400;
 export const STORAGE_KEY = "multi-timeframe-grid-state";
 export const AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
 
+// Swing detection defaults
+// - Lookback: Number of candles to check BEFORE the current candle
+// - Forward: Number of candles to check AFTER the current candle
+// Lower forward values = more real-time detection (but may repaint)
+// Higher forward values = more confirmed swings (but delayed)
+export const DEFAULT_LOOKBACK_PERIOD = 5;
+export const DEFAULT_FORWARD_PERIOD = 5;
+
+// Chart scale modes (like TradingView)
+export const SCALE_MODES = {
+	REGULAR: 'normal' as const,
+	LOGARITHMIC: 'logarithmic' as const,
+	PERCENTAGE: 'percentage' as const,
+	INDEXED: 'indexed' as const,
+};
+
+// Default scale settings
+export const DEFAULT_SCALE_SETTINGS = {
+	mode: SCALE_MODES.REGULAR,
+	position: 'right' as const,
+	invertScale: false,
+	autoScale: true,
+	visible: true,
+};
+
 

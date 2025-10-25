@@ -516,6 +516,112 @@
         color: #fff;
       }
 
+      /* Scale Menu (TradingView-style) */
+      .scale-menu-container {
+        position: relative;
+      }
+
+      .scale-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: #1e222d;
+        color: #787b86;
+        border: 1px solid #2a2e39;
+        padding: 8px 14px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        outline: none;
+        transition: all 0.2s ease;
+      }
+
+      .scale-btn:hover {
+        background: #2a2e39;
+        border-color: #2962ff;
+        color: #fff;
+      }
+
+      .scale-btn svg:last-child {
+        transition: transform 0.2s ease;
+      }
+
+      .scale-btn.active svg:last-child {
+        transform: rotate(180deg);
+      }
+
+      .scale-menu {
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 0;
+        background: #131722;
+        border: 1px solid #2a2e39;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        min-width: 220px;
+        display: none;
+        z-index: 1000;
+        padding: 8px 0;
+      }
+
+      .scale-menu.active {
+        display: block;
+      }
+
+      .scale-menu-section {
+        padding: 8px 0;
+      }
+
+      .scale-menu-title {
+        padding: 6px 16px;
+        font-size: 11px;
+        font-weight: 600;
+        color: #787b86;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .scale-menu-item {
+        display: flex;
+        align-items: center;
+        padding: 8px 16px;
+        font-size: 13px;
+        color: #d1d4dc;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background: none;
+        border: none;
+        width: 100%;
+        text-align: left;
+      }
+
+      .scale-menu-item:hover {
+        background: #1e222d;
+        color: #fff;
+      }
+
+      .scale-radio,
+      .scale-checkbox {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+      }
+
+      .scale-radio input[type="radio"],
+      .scale-checkbox input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+      }
+
+      .scale-menu-divider {
+        height: 1px;
+        background: #2a2e39;
+        margin: 4px 0;
+      }
+
       /* Responsive layouts */
       @media (max-width: 1920px) {
         .chart-wrapper {
@@ -583,6 +689,49 @@
           </svg>
           <span>Swing Structure</span>
         </button>
+        <div class="scale-menu-container">
+          <button class="scale-btn" id="scaleBtn">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M2 2V14H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M5 11L7 8L10 10L13 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Scale</span>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 5L6 8L9 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <div class="scale-menu" id="scaleMenu">
+            <div class="scale-menu-section">
+              <div class="scale-menu-title">Actions</div>
+              <button class="scale-menu-item" id="resetScaleBtn">Reset price scale</button>
+              <button class="scale-menu-item" id="autoFitBtn">Auto (fits data to screen)</button>
+            </div>
+            <div class="scale-menu-divider"></div>
+            <div class="scale-menu-section">
+              <div class="scale-menu-title">Scale Type</div>
+              <label class="scale-menu-item scale-radio">
+                <input type="radio" name="scaleMode" value="normal" checked>
+                <span>Regular</span>
+              </label>
+              <label class="scale-menu-item scale-radio">
+                <input type="radio" name="scaleMode" value="logarithmic">
+                <span>Logarithmic</span>
+              </label>
+            </div>
+            <div class="scale-menu-divider"></div>
+            <div class="scale-menu-section">
+              <div class="scale-menu-title">Display Options</div>
+              <label class="scale-menu-item scale-checkbox">
+                <input type="checkbox" id="invertScaleCheck">
+                <span>Invert scale</span>
+              </label>
+              <label class="scale-menu-item scale-checkbox">
+                <input type="checkbox" id="scaleLeftCheck">
+                <span>Move scale to left</span>
+              </label>
+            </div>
+          </div>
+        </div>
         <div class="lookback-control">
           <label for="comparisonPeriod">Lookback Window:</label>
           <select id="comparisonPeriod">
@@ -592,6 +741,17 @@
             <option value="6">6 Candles</option>
             <option value="7">7 Candles</option>
             <option value="8">8 Candles</option>
+            <option value="10">10 Candles</option>
+          </select>
+        </div>
+        <div class="lookback-control">
+          <label for="forwardPeriod">Forward Window:</label>
+          <select id="forwardPeriod">
+            <option value="1">1 Candle 🔥</option>
+            <option value="2">2 Candles</option>
+            <option value="3">3 Candles</option>
+            <option value="5" selected>5 Candles ⭐</option>
+            <option value="7">7 Candles</option>
             <option value="10">10 Candles</option>
           </select>
         </div>

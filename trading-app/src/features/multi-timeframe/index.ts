@@ -10,6 +10,9 @@ const priceChangeEl = document.getElementById("priceChange")!;
 const comparisonPeriodEl = document.getElementById(
 	"comparisonPeriod"
 ) as HTMLSelectElement;
+const forwardPeriodEl = document.getElementById(
+	"forwardPeriod"
+) as HTMLSelectElement;
 const lookbackPeriodEl = document.getElementById(
 	"lookbackPeriod"
 ) as HTMLSelectElement;
@@ -19,6 +22,15 @@ const addChartModal = document.getElementById("addChartModal")!;
 const timeframeGrid = document.getElementById("timeframeGrid")!;
 const modalCancelBtn = document.getElementById("modalCancelBtn")!;
 const modalAddBtn = document.getElementById("modalAddBtn")!;
+
+// Scale menu elements (TradingView-style)
+const scaleBtn = document.getElementById("scaleBtn")!;
+const scaleMenu = document.getElementById("scaleMenu")!;
+const resetScaleBtn = document.getElementById("resetScaleBtn")!;
+const autoFitBtn = document.getElementById("autoFitBtn")!;
+const scaleModeRadios = document.getElementsByName("scaleMode") as NodeListOf<HTMLInputElement>;
+const invertScaleCheck = document.getElementById("invertScaleCheck") as HTMLInputElement;
+const scaleLeftCheck = document.getElementById("scaleLeftCheck") as HTMLInputElement;
 
 // Global state (price data only - ChartManager manages chart settings)
 let globalFirstPrice = 0;
@@ -120,6 +132,13 @@ function setupEventListeners() {
 		chartManager.updateSettings({ comparisonPeriod: value });
 	});
 
+	// Forward period change - ChartManager is single source of truth
+	forwardPeriodEl.addEventListener("change", (e) => {
+		const value = parseInt((e.target as HTMLSelectElement).value);
+		console.log(`Forward period changed to: ${value} candles`);
+		chartManager.updateSettings({ forwardPeriod: value });
+	});
+
 	// Lookback period change - ChartManager is single source of truth
 	lookbackPeriodEl.addEventListener("change", (e) => {
 		const value = parseInt((e.target as HTMLSelectElement).value);
@@ -157,6 +176,58 @@ function setupEventListeners() {
 		if (e.target === addChartModal) {
 			closeAddChartModal();
 		}
+	});
+
+	// ===== Scale Menu Event Listeners (TradingView-style) =====
+	
+	// Toggle scale menu
+	scaleBtn.addEventListener("click", (e) => {
+		e.stopPropagation();
+		scaleBtn.classList.toggle("active");
+		scaleMenu.classList.toggle("active");
+	});
+
+	// Close scale menu when clicking outside
+	document.addEventListener("click", (e) => {
+		if (!scaleMenu.contains(e.target as Node) && e.target !== scaleBtn) {
+			scaleBtn.classList.remove("active");
+			scaleMenu.classList.remove("active");
+		}
+	});
+
+	// Reset price scale
+	resetScaleBtn.addEventListener("click", () => {
+		chartManager.resetAllPriceScales();
+		console.log("Price scales reset");
+	});
+
+	// Auto-fit charts
+	autoFitBtn.addEventListener("click", () => {
+		chartManager.autoFitAllCharts();
+		console.log("Auto-fit applied to all charts");
+	});
+
+	// Scale mode change (Regular/Logarithmic)
+	scaleModeRadios.forEach((radio) => {
+		radio.addEventListener("change", (e) => {
+			const mode = (e.target as HTMLInputElement).value as 'normal' | 'logarithmic';
+			chartManager.applyScaleSettings({ mode });
+			console.log(`Scale mode changed to: ${mode}`);
+		});
+	});
+
+	// Invert scale toggle
+	invertScaleCheck.addEventListener("change", (e) => {
+		const invertScale = (e.target as HTMLInputElement).checked;
+		chartManager.applyScaleSettings({ invertScale });
+		console.log(`Invert scale: ${invertScale}`);
+	});
+
+	// Scale position toggle (left/right)
+	scaleLeftCheck.addEventListener("change", (e) => {
+		const position = (e.target as HTMLInputElement).checked ? 'left' : 'right';
+		chartManager.applyScaleSettings({ position });
+		console.log(`Scale position: ${position}`);
 	});
 }
 
@@ -221,11 +292,21 @@ async function addSelectedChart() {
 	showLoading(true);
 
 	try {
-		await chartManager.addChart(timeframe);
-		console.log(`Added chart: ${timeframe.label}`);
+		const chartId = await chartManager.addChart(timeframe);
+		console.log(`✓ Added chart ${chartId}: ${timeframe.label}`);
 	} catch (error) {
 		console.error("Error adding chart:", error);
-		showError(`Failed to add ${timeframe.label} chart`);
+		
+		// Show detailed error message
+		const errorMsg = error instanceof Error ? error.message : String(error);
+		showError(`Failed to add ${timeframe.label} chart: ${errorMsg}`);
+		
+		// If it's a data loading error, suggest checking network
+		if (errorMsg.includes('Failed to load data') || errorMsg.includes('HTTP error')) {
+			setTimeout(() => {
+				showError('Please check your internet connection and try again');
+			}, 3000);
+		}
 	} finally {
 		showLoading(false);
 	}
