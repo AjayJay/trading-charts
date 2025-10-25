@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BTC Multi-Timeframe Analysis</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        background: #0a0e27;
+        color: #fff;
+        overflow: auto;
+      }
+
+      .header {
+        background: #131722;
+        padding: 12px 20px;
+        border-bottom: 1px solid #2a2e39;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+
+      .title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .back-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: transparent;
+        color: #787b86;
+        border: 1px solid #2a2e39;
+        padding: 8px 14px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        outline: none;
+        transition: all 0.2s ease;
+      }
+
+      .back-btn:hover {
+        background: #2a2e39;
+        color: #fff;
+        border-color: #2962ff;
+      }
+
+      .title h1 {
+        font-size: 20px;
+        font-weight: 600;
+        color: #f7931a;
+      }
+
+      .price-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 13px;
+      }
+
+      .current-price {
+        font-size: 18px;
+        font-weight: 700;
+        color: #26a69a;
+      }
+
+      .price-change {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .price-change.positive {
+        background: rgba(38, 166, 154, 0.2);
+        color: #26a69a;
+      }
+
+      .price-change.negative {
+        background: rgba(239, 83, 80, 0.2);
+        color: #ef5350;
+      }
+
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .toggle-swing-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: #1e222d;
+        color: #787b86;
+        border: 1px solid #2a2e39;
+        padding: 8px 14px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        outline: none;
+        transition: all 0.2s ease;
+      }
+
+      .toggle-swing-btn:hover {
+        background: #2a2e39;
+        border-color: #2962ff;
+      }
+
+      .toggle-swing-btn.active {
+        background: #2962ff;
+        color: #fff;
+        border-color: #2962ff;
+      }
+
+      .toggle-swing-btn svg {
+        transition: transform 0.2s ease;
+      }
+
+      .toggle-swing-btn.active svg {
+        transform: rotate(0deg);
+      }
+
+      .toggle-swing-btn:not(.active) svg {
+        opacity: 0.5;
+      }
+
+      .lookback-control {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #d1d4dc;
+      }
+
+      .lookback-control label {
+        font-weight: 600;
+        color: #787b86;
+      }
+
+      .lookback-control select {
+        background: #1e222d;
+        color: #d1d4dc;
+        border: 1px solid #2a2e39;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        outline: none;
+        transition: all 0.2s ease;
+      }
+
+      .lookback-control select:hover {
+        border-color: #2962ff;
+        background: #2a2e39;
+      }
+
+      .lookback-control select:focus {
+        border-color: #2962ff;
+        box-shadow: 0 0 0 2px rgba(41, 98, 255, 0.2);
+      }
+
+      .auto-refresh {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: #787b86;
+      }
+
+      .refresh-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #26a69a;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+      }
+
+      .loading {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        z-index: 1000;
+        background: rgba(10, 14, 39, 0.95);
+        padding: 30px 40px;
+        border-radius: 12px;
+        border: 1px solid #2a2e39;
+      }
+
+      .spinner {
+        border: 3px solid #2a2e39;
+        border-top: 3px solid #2962ff;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 10px;
+      }
+
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+
+      .charts-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        padding: 8px;
+        min-height: calc(100vh - 60px);
+      }
+
+      .chart-container {
+        background: #131722;
+        border-radius: 8px;
+        border: 1px solid #2a2e39;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        min-height: 400px;
+      }
+
+      .chart-header {
+        background: #1e222d;
+        padding: 10px 15px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #2a2e39;
+      }
+
+      .chart-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #2962ff;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .chart-price {
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .chart-price.positive {
+        color: #26a69a;
+      }
+
+      .chart-price.negative {
+        color: #ef5350;
+      }
+
+      .chart-content {
+        flex: 1;
+        position: relative;
+        min-height: 350px;
+      }
+
+      .chart-loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 12px;
+        color: #787b86;
+      }
+
+      .error-message {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: rgba(239, 83, 80, 0.95);
+        color: #fff;
+        padding: 15px 20px;
+        border-radius: 8px;
+        border: 1px solid #ef5350;
+        z-index: 1000;
+        display: none;
+        max-width: 400px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+
+      /* Responsive layouts */
+      @media (max-width: 1920px) {
+        .charts-grid {
+          grid-template-columns: repeat(4, 1fr);
+        }
+      }
+
+      @media (max-width: 1600px) {
+        .charts-grid {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+
+      @media (max-width: 1200px) {
+        .charts-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      @media (max-width: 768px) {
+        .charts-grid {
+          grid-template-columns: 1fr;
+        }
+        
+        .title h1 {
+          font-size: 16px;
+        }
+
+        .current-price {
+          font-size: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <div class="title">
+        <button class="back-btn" onclick="window.location.href='../../../index.html'">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Back</span>
+        </button>
+        <h1>₿ Bitcoin Multi-Timeframe Analysis</h1>
+        <div class="price-info">
+          <span class="current-price" id="currentPrice">--</span>
+          <span class="price-change" id="priceChange">--</span>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="toggle-swing-btn active" id="toggleSwingBtn">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2 8L6 4M6 4L10 8M6 4V12M14 8L10 12M10 12L6 8M10 12V4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Swing Structure</span>
+        </button>
+        <div class="lookback-control">
+          <label for="comparisonPeriod">Lookback Window:</label>
+          <select id="comparisonPeriod">
+            <option value="3">3 Candles</option>
+            <option value="4">4 Candles</option>
+            <option value="5" selected>5 Candles ⭐</option>
+            <option value="6">6 Candles</option>
+            <option value="7">7 Candles</option>
+            <option value="8">8 Candles</option>
+            <option value="10">10 Candles</option>
+          </select>
+        </div>
+        <div class="lookback-control">
+          <label for="lookbackPeriod">Analyze Last:</label>
+          <select id="lookbackPeriod">
+            <option value="50">50 Candles</option>
+            <option value="100">100 Candles</option>
+            <option value="200" selected>200 Candles ⭐</option>
+            <option value="300">300 Candles</option>
+            <option value="500">500 Candles</option>
+          </select>
+        </div>
+        <div class="auto-refresh">
+          <div class="refresh-indicator"></div>
+          <span>Auto-refresh: 30s</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <div>Loading all timeframes...</div>
+    </div>
+
+    <div class="error-message" id="errorMessage"></div>
+    
+    <div class="charts-grid" id="chartsGrid">
+      <!-- Charts will be dynamically created here -->
+      <div class="chart-container">
+        <div class="chart-header">
+          <span class="chart-title">1 Minute</span>
+          <span class="chart-price" id="price-1m">--</span>
+        </div>
+        <div class="chart-content" id="chart-1m">
+          <div class="chart-loading">Loading...</div>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-header">
+          <span class="chart-title">5 Minutes</span>
+          <span class="chart-price" id="price-5m">--</span>
+        </div>
+        <div class="chart-content" id="chart-5m">
+          <div class="chart-loading">Loading...</div>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-header">
+          <span class="chart-title">15 Minutes</span>
+          <span class="chart-price" id="price-15m">--</span>
+        </div>
+        <div class="chart-content" id="chart-15m">
+          <div class="chart-loading">Loading...</div>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-header">
+          <span class="chart-title">30 Minutes</span>
+          <span class="chart-price" id="price-30m">--</span>
+        </div>
+        <div class="chart-content" id="chart-30m">
+          <div class="chart-loading">Loading...</div>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-header">
+          <span class="chart-title">1 Hour</span>
+          <span class="chart-price" id="price-1h">--</span>
+        </div>
+        <div class="chart-content" id="chart-1h">
+          <div class="chart-loading">Loading...</div>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-header">
+          <span class="chart-title">4 Hours</span>
+          <span class="chart-price" id="price-4h">--</span>
+        </div>
+        <div class="chart-content" id="chart-4h">
+          <div class="chart-loading">Loading...</div>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-header">
+          <span class="chart-title">Daily</span>
+          <span class="chart-price" id="price-1d">--</span>
+        </div>
+        <div class="chart-content" id="chart-1d">
+          <div class="chart-loading">Loading...</div>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-header">
+          <span class="chart-title">Weekly</span>
+          <span class="chart-price" id="price-1w">--</span>
+        </div>
+        <div class="chart-content" id="chart-1w">
+          <div class="chart-loading">Loading...</div>
+        </div>
+      </div>
+    </div>
+    
+    <script type="module" src="index.ts"></script>
+  </body>
+</html>

@@ -3,6 +3,31 @@
 This folder is dedicated to creating and testing debug files that won't be committed to the repository. It provides a safe environment for contributors to experiment and test without impacting the main codebase.
 It also offers an easy way to manage multiple sandboxes and includes a default template to help you get started quickly.
 
+## Feature Organization
+
+The debug environment includes a landing page that organizes different charting features:
+
+- **Landing Page**: Located at `default/index.html` - provides an overview and navigation to all features
+- **Features**: Located in `playground/` directory - each feature has its own sandbox
+  - `btc-multi-timeframe.d/` - Multi-timeframe Bitcoin analysis with swing structure detection
+  - Add more features as separate sandboxes...
+
+### Accessing Features
+
+1. Navigate to `debug/default/index.html` to see the landing page
+2. Click on any feature card to explore that feature
+3. Use the "Back" button in each feature to return to the landing page
+
+### Adding a New Feature
+
+1. Create a new sandbox (see "Creating a Sandbox" below)
+2. Build your feature in the sandbox
+3. Add a feature card to `default/index.html` with:
+   - Icon and title
+   - Description
+   - Link to your feature's HTML file
+   - Status badge (Live/Coming Soon)
+
 ## Usage
 
 Before using the package, initialize the common root directory for all experiments by running:

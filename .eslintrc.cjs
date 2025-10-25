@@ -177,7 +177,7 @@ module.exports = {
 		},
 		{
 			files: ['**/*.ts', '**/*.tsx'],
-			excludedFiles: ['dist/**'],
+			excludedFiles: ['dist/**', 'trading-app/**'],
 			parser: '@typescript-eslint/parser',
 			extends: tsRulesExtendsWithTypeCheck,
 			parserOptions: {
