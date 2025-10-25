@@ -1,0 +1,20 @@
+{
+  "name": "trading-app",
+  "version": "1.0.0",
+  "description": "Advanced trading application built with Lightweight Charts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "lightweight-charts": "file:.."
+  },
+  "devDependencies": {
+    "typescript": "^5.2.2",
+    "vite": "^5.0.0"
+  }
+}
+
