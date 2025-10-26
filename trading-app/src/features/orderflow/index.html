@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Volume Profile - Order Flow Analysis</title>
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+		}
+
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+			background: #0b0e11;
+			color: #d1d4dc;
+			overflow: hidden;
+			height: 100vh;
+		}
+
+		.header {
+			background: #1e222d;
+			padding: 15px 20px;
+			border-bottom: 1px solid #2b2b43;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+
+		.logo {
+			display: flex;
+			align-items: center;
+			gap: 0;
+		}
+
+		.logo h1 {
+			font-size: 20px;
+			color: #f0b90b;
+		}
+
+		.status {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			padding: 8px 15px;
+			background: #131722;
+			border-radius: 6px;
+		}
+
+		.status-dot {
+			width: 10px;
+			height: 10px;
+			border-radius: 50%;
+			background: #666;
+			animation: pulse 2s infinite;
+		}
+
+		.status-dot.connected {
+			background: #26a69a;
+		}
+
+		.status-dot.loading {
+			background: #f7931a;
+		}
+
+		@keyframes pulse {
+			0%, 100% { opacity: 1; }
+			50% { opacity: 0.5; }
+		}
+
+		.controls {
+			background: #1e222d;
+			padding: 15px 20px;
+			border-bottom: 1px solid #2b2b43;
+			display: flex;
+			gap: 15px;
+			flex-wrap: wrap;
+			align-items: center;
+		}
+
+		.control-group {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+		}
+
+		label {
+			font-size: 13px;
+			color: #787b86;
+		}
+
+		select, input[type="number"] {
+			padding: 6px 12px;
+			background: #131722;
+			border: 1px solid #2b2b43;
+			border-radius: 4px;
+			color: #d1d4dc;
+			font-size: 13px;
+		}
+
+		button {
+			padding: 8px 16px;
+			background: #f0b90b;
+			border: none;
+			border-radius: 4px;
+			color: #000;
+			font-weight: 600;
+			cursor: pointer;
+			font-size: 13px;
+			transition: background 0.2s;
+		}
+
+		button:hover {
+			background: #fcd535;
+		}
+
+		button.secondary {
+			background: #2962ff;
+			color: white;
+		}
+
+		button.secondary:hover {
+			background: #1e53e5;
+		}
+
+		button.danger {
+			background: #ef5350;
+			color: white;
+		}
+
+		button.danger:hover {
+			background: #d32f2f;
+		}
+
+		button:disabled {
+			opacity: 0.5;
+			cursor: not-allowed;
+		}
+
+		.main-content {
+			display: flex;
+			height: calc(100vh - 120px);
+			gap: 15px;
+			padding: 15px;
+		}
+
+		.trades-main-section {
+			flex: 1;
+			background: #1e222d;
+			border-radius: 8px;
+			padding: 20px;
+			display: flex;
+			flex-direction: column;
+			overflow: hidden;
+		}
+
+		.trades-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 20px;
+			padding-bottom: 15px;
+			border-bottom: 2px solid #2b2b43;
+		}
+
+		.trades-header h2 {
+			font-size: 24px;
+			color: #f0b90b;
+			font-weight: 700;
+		}
+
+		.trade-stats {
+			display: flex;
+			gap: 30px;
+		}
+
+		.stat-item {
+			display: flex;
+			flex-direction: column;
+			gap: 5px;
+		}
+
+		.stat-label {
+			font-size: 11px;
+			color: #787b86;
+			text-transform: uppercase;
+		}
+
+		.stat-value {
+			font-size: 20px;
+			font-weight: bold;
+			color: #d1d4dc;
+		}
+
+		.trade-filters {
+			display: flex;
+			gap: 15px;
+			flex-wrap: wrap;
+			padding: 15px;
+			background: #131722;
+			border-radius: 6px;
+			margin-bottom: 20px;
+			align-items: flex-end;
+		}
+
+		.filter-group {
+			display: flex;
+			flex-direction: column;
+			gap: 5px;
+		}
+
+		.filter-group label {
+			font-size: 11px;
+			color: #787b86;
+			font-weight: 600;
+			text-transform: uppercase;
+		}
+
+		.filter-group select,
+		.filter-group input {
+			padding: 8px 12px;
+			background: #1e222d;
+			border: 1px solid #2b2b43;
+			border-radius: 4px;
+			color: #d1d4dc;
+			font-size: 13px;
+			min-width: 120px;
+		}
+
+		.filter-group input {
+			min-width: 100px;
+		}
+
+		.trades-table-container {
+			flex: 1;
+			overflow-y: auto;
+			border: 1px solid #2b2b43;
+			border-radius: 6px;
+		}
+
+		.compact-sidebar {
+			width: 280px;
+			background: #1e222d;
+			border-radius: 8px;
+			padding: 20px;
+			overflow-y: auto;
+		}
+
+		.sidebar-header {
+			margin-bottom: 15px;
+			padding-bottom: 10px;
+			border-bottom: 1px solid #2b2b43;
+		}
+
+		.sidebar-header h3 {
+			font-size: 16px;
+			color: #d1d4dc;
+			font-weight: 600;
+		}
+
+		.compact-metrics {
+			display: flex;
+			flex-direction: column;
+			gap: 12px;
+		}
+
+		.metrics-grid {
+			display: grid;
+			gap: 15px;
+		}
+
+		.metric-card {
+			background: #131722;
+			padding: 12px;
+			border-radius: 6px;
+			border-left: 3px solid #f0b90b;
+		}
+
+		.metric-label {
+			font-size: 10px;
+			color: #787b86;
+			text-transform: uppercase;
+			margin-bottom: 4px;
+		}
+
+		.metric-value {
+			font-size: 16px;
+			font-weight: bold;
+			color: #d1d4dc;
+		}
+
+		.metric-subtext {
+			font-size: 11px;
+			color: #787b86;
+			margin-top: 2px;
+		}
+
+		.price-value {
+			color: #f0b90b;
+		}
+
+		.positive {
+			color: #26a69a;
+		}
+
+		.negative {
+			color: #ef5350;
+		}
+
+		.live-trades {
+			margin-top: 20px;
+		}
+
+		.live-trades h3 {
+			font-size: 14px;
+			margin-bottom: 10px;
+			color: #787b86;
+			text-transform: uppercase;
+			letter-spacing: 0.5px;
+		}
+
+		.trades-table {
+			width: 100%;
+			border-collapse: collapse;
+			font-size: 12px;
+		}
+
+		.trades-table thead {
+			background: #1e222d;
+		}
+
+		.trades-table th {
+			padding: 12px 12px;
+			text-align: left;
+			color: #787b86;
+			font-weight: 700;
+			text-transform: uppercase;
+			font-size: 11px;
+			letter-spacing: 0.5px;
+			border-bottom: 2px solid #2b2b43;
+			background: #131722;
+			position: sticky;
+			top: 0;
+			z-index: 10;
+		}
+
+		.trades-table td {
+			padding: 10px 12px;
+			border-bottom: 1px solid #1e222d;
+		}
+
+		.trades-table tr.buy {
+			border-left: 3px solid #26a69a;
+		}
+
+		.trades-table tr.sell {
+			border-left: 3px solid #ef5350;
+		}
+
+		.trade-time {
+			color: #787b86;
+			font-size: 10px;
+		}
+
+		.trade-price {
+			font-weight: bold;
+		}
+
+		.trade-price.buy {
+			color: #26a69a;
+		}
+
+		.trade-price.sell {
+			color: #ef5350;
+		}
+
+		.trade-volume {
+			color: #d1d4dc;
+		}
+
+		.trade-maker {
+			font-size: 10px;
+			padding: 2px 6px;
+			border-radius: 3px;
+			background: rgba(120, 123, 134, 0.2);
+			color: #787b86;
+		}
+
+		.trade-maker.maker {
+			background: rgba(41, 98, 255, 0.2);
+			color: #2962ff;
+		}
+
+		.trade-side {
+			font-weight: 600;
+			font-size: 10px;
+			text-transform: uppercase;
+		}
+
+		.trade-side.buy {
+			color: #26a69a;
+		}
+
+		.trade-side.sell {
+			color: #ef5350;
+		}
+
+		#loading {
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background: rgba(0, 0, 0, 0.8);
+			display: none;
+			align-items: center;
+			justify-content: center;
+			z-index: 1000;
+		}
+
+		.loading-content {
+			text-align: center;
+		}
+
+		.spinner {
+			width: 50px;
+			height: 50px;
+			border: 4px solid #2b2b43;
+			border-top-color: #f0b90b;
+			border-radius: 50%;
+			animation: spin 1s linear infinite;
+			margin: 0 auto 20px;
+		}
+
+		@keyframes spin {
+			to { transform: rotate(360deg); }
+		}
+
+		#errorMessage {
+			position: fixed;
+			top: 20px;
+			right: 20px;
+			background: #ef5350;
+			color: white;
+			padding: 15px 20px;
+			border-radius: 6px;
+			display: none;
+			z-index: 1001;
+			max-width: 400px;
+		}
+	</style>
+</head>
+<body>
+	<div class="header">
+		<div class="logo">
+			<button id="backBtn" style="
+				padding: 8px 16px;
+				background: transparent;
+				border: 1px solid #2b2b43;
+				border-radius: 6px;
+				color: #d1d4dc;
+				cursor: pointer;
+				margin-right: 15px;
+				font-size: 14px;
+				transition: all 0.2s;
+			" onmouseover="this.style.borderColor='#2962ff'" onmouseout="this.style.borderColor='#2b2b43'" onclick="window.location.href='../../../index.html'">
+				← Back
+			</button>
+			<h1>⚡ Volume Profile - Order Flow Analysis</h1>
+		</div>
+		<div class="status">
+			<div class="status-dot" id="statusDot"></div>
+			<span id="statusText">Initializing...</span>
+		</div>
+	</div>
+
+	<div class="controls">
+		<div class="control-group">
+			<label>💱 Symbol:</label>
+			<select id="symbolSelect"></select>
+		</div>
+
+		<div class="control-group">
+			<button id="toggleLiveBtn" class="secondary">▶️ Start Live</button>
+		</div>
+
+		<div class="control-group">
+			<button id="snapshotBtn" style="background: #9c27b0; color: white;" disabled>📸 Freeze View</button>
+		</div>
+
+		<div class="control-group">
+			<span id="modeIndicator" style="
+				padding: 6px 12px;
+				background: #131722;
+				border-radius: 4px;
+				font-size: 12px;
+				color: #787b86;
+				border: 1px solid #2b2b43;
+			">🔴 LIVE MODE</span>
+		</div>
+	</div>
+
+	<div class="main-content">
+		<!-- Live Trades - MAIN FOCUS -->
+		<div class="trades-main-section">
+			<div class="trades-header">
+				<h2>📊 Live Order Flow</h2>
+				<div class="trade-stats">
+					<div class="stat-item">
+						<span class="stat-label">Total Trades:</span>
+						<span class="stat-value" id="totalTradesCount">0</span>
+					</div>
+					<div class="stat-item">
+						<span class="stat-label">Showing:</span>
+						<span class="stat-value" id="showingTradesCount">0</span>
+					</div>
+					<div class="stat-item">
+						<span class="stat-label">Buy/Sell Ratio:</span>
+						<span class="stat-value" id="buySellRatio">0.00</span>
+					</div>
+				</div>
+			</div>
+
+			<!-- Trade Filters -->
+			<div class="trade-filters">
+				<div style="width: 100%; color: #787b86; font-size: 11px; margin-bottom: 5px;">
+					💡 <strong>Filter Tips:</strong> Volume is in BTC (e.g., 0.001). Most trades are 0.0001-0.01 BTC. Use "Min Total (USD)" to filter by dollar value.
+				</div>
+				<div class="filter-group">
+					<label>🔍 Filter by Side:</label>
+					<select id="filterSide">
+						<option value="all">All Trades</option>
+						<option value="buy">Buy Only</option>
+						<option value="sell">Sell Only</option>
+					</select>
+				</div>
+
+				<div class="filter-group">
+					<label>🏷️ Filter by Type:</label>
+					<select id="filterMaker">
+						<option value="all">All Types</option>
+						<option value="maker">Maker Only</option>
+						<option value="taker">Taker Only</option>
+					</select>
+				</div>
+
+				<div class="filter-group">
+					<label>📊 Min Volume (BTC):</label>
+					<input type="number" id="filterMinVolume" placeholder="0.0001" step="0.0001" value="0">
+				</div>
+
+				<div class="filter-group">
+					<label>💵 Min Total (USD):</label>
+					<input type="number" id="filterMinTotal" placeholder="0" step="1" value="0">
+				</div>
+
+				<div class="filter-group">
+					<label>💰 Price Range:</label>
+					<div style="display: flex; gap: 5px;">
+						<input type="number" id="filterMinPrice" placeholder="Min" step="100" style="width: 80px;">
+						<span style="color: #787b86;">-</span>
+						<input type="number" id="filterMaxPrice" placeholder="Max" step="100" style="width: 80px;">
+					</div>
+				</div>
+
+				<div class="filter-group">
+					<label>📋 Show:</label>
+					<select id="filterLimit">
+						<option value="50">50 Trades</option>
+						<option value="100" selected>100 Trades</option>
+						<option value="200">200 Trades</option>
+						<option value="500">500 Trades</option>
+					</select>
+				</div>
+
+				<button id="clearFiltersBtn" class="secondary">🔄 Clear Filters</button>
+			</div>
+
+			<!-- Live Trades Table -->
+			<div class="trades-table-container">
+				<table class="trades-table">
+					<thead>
+						<tr>
+							<th>Time</th>
+							<th>Price (USD)</th>
+							<th>Volume (BTC)</th>
+							<th>Total (USD)</th>
+							<th>Type</th>
+							<th>Side</th>
+						</tr>
+					</thead>
+					<tbody id="liveTradesList">
+						<tr>
+							<td colspan="6" style="text-align: center; padding: 40px; color: #787b86;">
+								Click "Start Live" to begin streaming trades...
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
+
+		<!-- Compact Metrics Sidebar -->
+		<div class="compact-sidebar">
+			<div class="sidebar-header">
+				<h3>📈 Metrics</h3>
+			</div>
+			<div class="compact-metrics" id="metricsContainer">
+				<!-- Metrics will be populated here -->
+			</div>
+		</div>
+	</div>
+
+	<!-- Hidden chart container for data processing -->
+	<div id="chartContainer" style="display: none;"></div>
+
+	<div id="loading">
+		<div class="loading-content">
+			<div class="spinner"></div>
+			<div>Loading data...</div>
+		</div>
+	</div>
+
+	<div id="errorMessage"></div>
+
+	<script type="module" src="./index.ts"></script>
+</body>
+</html>

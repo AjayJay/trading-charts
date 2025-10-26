@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Live BTC Volume Profile - Binance</title>
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+		}
+
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+			background: #0b0e11;
+			color: #d1d4dc;
+			overflow: hidden;
+		}
+
+		.header {
+			background: #1e222d;
+			padding: 15px 20px;
+			border-bottom: 1px solid #2b2b43;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+
+		.logo {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+		}
+
+		.logo h1 {
+			font-size: 20px;
+			color: #f0b90b;
+		}
+
+		.status {
+			display: flex;
+			align-items: center;
+			gap: 20px;
+		}
+
+		.status-indicator {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			padding: 8px 15px;
+			background: #131722;
+			border-radius: 6px;
+		}
+
+		.status-dot {
+			width: 10px;
+			height: 10px;
+			border-radius: 50%;
+			background: #666;
+			animation: pulse 2s infinite;
+		}
+
+		.status-dot.connected {
+			background: #26a69a;
+		}
+
+		.status-dot.loading {
+			background: #f7931a;
+		}
+
+		@keyframes pulse {
+			0%, 100% { opacity: 1; }
+			50% { opacity: 0.5; }
+		}
+
+		.controls {
+			background: #1e222d;
+			padding: 15px 20px;
+			border-bottom: 1px solid #2b2b43;
+			display: flex;
+			gap: 15px;
+			flex-wrap: wrap;
+			align-items: center;
+		}
+
+		.control-group {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+		}
+
+		label {
+			font-size: 13px;
+			color: #787b86;
+		}
+
+		select, input[type="number"] {
+			padding: 6px 12px;
+			background: #131722;
+			border: 1px solid #2b2b43;
+			border-radius: 4px;
+			color: #d1d4dc;
+			font-size: 13px;
+		}
+
+		button {
+			padding: 8px 16px;
+			background: #f0b90b;
+			border: none;
+			border-radius: 4px;
+			color: #000;
+			font-weight: 600;
+			cursor: pointer;
+			font-size: 13px;
+			transition: background 0.2s;
+		}
+
+		button:hover {
+			background: #fcd535;
+		}
+
+		button.secondary {
+			background: #2962ff;
+			color: white;
+		}
+
+		button.secondary:hover {
+			background: #1e53e5;
+		}
+
+		button.danger {
+			background: #ef5350;
+			color: white;
+		}
+
+		button.danger:hover {
+			background: #d32f2f;
+		}
+
+		button:disabled {
+			opacity: 0.5;
+			cursor: not-allowed;
+		}
+
+		.main-content {
+			display: flex;
+			height: calc(100vh - 120px);
+		}
+
+		.chart-section {
+			flex: 1;
+			padding: 10px;
+		}
+
+		#chart-container {
+			width: 100%;
+			height: 100%;
+			background: #131722;
+			border-radius: 8px;
+		}
+
+		.sidebar {
+			width: 300px;
+			background: #1e222d;
+			padding: 20px;
+			overflow-y: auto;
+			border-left: 1px solid #2b2b43;
+		}
+
+		.metrics-grid {
+			display: grid;
+			gap: 15px;
+		}
+
+		.metric-card {
+			background: #131722;
+			padding: 15px;
+			border-radius: 6px;
+			border-left: 3px solid #f0b90b;
+		}
+
+		.metric-label {
+			font-size: 11px;
+			color: #787b86;
+			text-transform: uppercase;
+			margin-bottom: 5px;
+		}
+
+		.metric-value {
+			font-size: 20px;
+			font-weight: bold;
+			color: #d1d4dc;
+		}
+
+		.metric-subtext {
+			font-size: 12px;
+			color: #787b86;
+			margin-top: 3px;
+		}
+
+		.price-value {
+			color: #f0b90b;
+		}
+
+		.positive {
+			color: #26a69a;
+		}
+
+		.negative {
+			color: #ef5350;
+		}
+
+		.live-trades {
+			margin-top: 20px;
+		}
+
+		.live-trades h3 {
+			font-size: 14px;
+			margin-bottom: 10px;
+			color: #787b86;
+		}
+
+		.trade-item {
+			display: flex;
+			justify-content: space-between;
+			padding: 8px 10px;
+			background: #131722;
+			border-radius: 4px;
+			margin-bottom: 5px;
+			font-size: 12px;
+			border-left: 3px solid transparent;
+		}
+
+		.trade-item.buy {
+			border-left-color: #26a69a;
+		}
+
+		.trade-item.sell {
+			border-left-color: #ef5350;
+		}
+
+		.trade-price {
+			font-weight: bold;
+		}
+
+		.trade-volume {
+			color: #787b86;
+		}
+
+		.loading-overlay {
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background: rgba(0, 0, 0, 0.8);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			z-index: 1000;
+		}
+
+		.loading-content {
+			text-align: center;
+		}
+
+		.spinner {
+			width: 50px;
+			height: 50px;
+			border: 4px solid #2b2b43;
+			border-top-color: #f0b90b;
+			border-radius: 50%;
+			animation: spin 1s linear infinite;
+			margin: 0 auto 20px;
+		}
+
+		@keyframes spin {
+			to { transform: rotate(360deg); }
+		}
+	</style>
+</head>
+<body>
+	<div class="header">
+		<div class="logo">
+			<h1>⚡ Live BTC Volume Profile</h1>
+			<span style="font-size: 12px; color: #787b86;">Powered by Binance</span>
+		</div>
+		<div class="status">
+			<div class="status-indicator">
+				<div class="status-dot" id="status-dot"></div>
+				<span id="status-text">Connecting...</span>
+			</div>
+		</div>
+	</div>
+
+	<div class="controls">
+		<div class="control-group">
+			<label>Symbol:</label>
+			<select id="symbol-select">
+				<option value="BTCUSDT" selected>BTC/USDT</option>
+				<option value="ETHUSDT">ETH/USDT</option>
+				<option value="BNBUSDT">BNB/USDT</option>
+			</select>
+		</div>
+
+		<div class="control-group">
+			<label>Time Range:</label>
+			<select id="time-range">
+				<option value="1">Last 1 Hour</option>
+				<option value="4" selected>Last 4 Hours</option>
+				<option value="8">Last 8 Hours</option>
+				<option value="24">Last 24 Hours</option>
+			</select>
+		</div>
+
+		<div class="control-group">
+			<label>Price Levels:</label>
+			<input type="number" id="price-levels" value="50" min="10" max="200" step="10">
+		</div>
+
+		<div class="control-group">
+			<label>Display:</label>
+			<select id="display-mode">
+				<option value="combined">Combined</option>
+				<option value="separated" selected>Buy/Sell Split</option>
+			</select>
+		</div>
+
+		<button id="load-data">Load Data</button>
+		<button id="toggle-live" class="secondary">Start Live Feed</button>
+		<button id="clear-chart" class="danger">Clear</button>
+	</div>
+
+	<div class="main-content">
+		<div class="chart-section">
+			<div id="chart-container"></div>
+		</div>
+
+		<div class="sidebar">
+			<div class="metrics-grid" id="metrics">
+				<!-- Metrics will be populated here -->
+			</div>
+
+			<div class="live-trades">
+				<h3>LIVE TRADES</h3>
+				<div id="live-trades-list">
+					<!-- Live trades will appear here -->
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div id="loading-overlay" class="loading-overlay" style="display: none;">
+		<div class="loading-content">
+			<div class="spinner"></div>
+			<div id="loading-text">Loading data...</div>
+		</div>
+	</div>
+
+	<script type="module">
+		import { VolumeProfileChart } from './components/VolumeProfileChart.ts';
+		import { VolumeProfileProcessor } from './utils/volumeProfileProcessor.ts';
+		import { BinanceAPI, BinanceWebSocket } from './utils/binanceAPI.ts';
+
+		let chart = null;
+		let binanceWS = null;
+		let isLiveMode = false;
+		let tradeBuffer = [];
+		let liveTradesList = [];
+		const MAX_LIVE_TRADES_DISPLAY = 10;
+
+		// Initialize
+		async function init() {
+			showLoading('Initializing chart...');
+			
+			chart = new VolumeProfileChart({
+				container: 'chart-container',
+				seriesType: 'line',
+				chartOptions: {
+					autoSize: true,
+					layout: {
+						background: { color: '#131722' },
+						textColor: '#d1d4dc',
+					},
+					grid: {
+						vertLines: { color: '#1e222d' },
+						horzLines: { color: '#1e222d' },
+					},
+				},
+				volumeProfileOptions: {
+					buyColor: 'rgba(38, 166, 154, 0.7)',
+					sellColor: 'rgba(239, 83, 80, 0.7)',
+					separateBuySell: true,
+				},
+			});
+
+			hideLoading();
+			updateStatus('Ready', 'connected');
+			
+			// Load initial data
+			await loadBinanceData();
+		}
+
+		// Load data from Binance
+		async function loadBinanceData() {
+			try {
+				showLoading('Fetching BTC trades from Binance...');
+				updateStatus('Loading...', 'loading');
+
+				const symbol = document.getElementById('symbol-select').value;
+				const hours = parseInt(document.getElementById('time-range').value);
+				const numLevels = parseInt(document.getElementById('price-levels').value);
+				const separateBuySell = document.getElementById('display-mode').value === 'separated';
+
+				const binanceAPI = new BinanceAPI({ symbol });
+				
+				// Fetch trades
+				const trades = await binanceAPI.fetchTradesLastHours(hours, 5000);
+				console.log(`📊 Fetched ${trades.length} trades`);
+
+				// Get 24h stats
+				const stats = await binanceAPI.get24hStats();
+
+				// Clear existing profiles
+				chart.clearVolumeProfiles();
+
+				// Add volume profile
+				chart.addVolumeProfileFromTrades(trades, {
+					numPriceLevels: numLevels,
+					separateBuySell: separateBuySell,
+				});
+
+				// Calculate metrics
+				const vpData = VolumeProfileProcessor.processTradeData(trades, {
+					numPriceLevels: numLevels,
+				});
+
+				const poc = VolumeProfileProcessor.calculatePOC(vpData.profile);
+				const valueArea = VolumeProfileProcessor.calculateValueArea(vpData.profile, 0.7);
+
+				// Update metrics
+				updateMetrics({
+					currentPrice: stats.lastPrice,
+					priceChange: stats.priceChange,
+					priceChangePercent: stats.priceChangePercent,
+					totalTrades: trades.length,
+					totalVolume: trades.reduce((sum, t) => sum + t.volume, 0),
+					poc: poc,
+					valueAreaHigh: valueArea?.high,
+					valueAreaLow: valueArea?.low,
+					high24h: stats.highPrice,
+					low24h: stats.lowPrice,
+					volume24h: stats.volume,
+				});
+
+				chart.fitContent();
+				hideLoading();
+				updateStatus('Connected', 'connected');
+
+				// Store trades for live updates
+				tradeBuffer = trades;
+
+			} catch (error) {
+				console.error('Error loading Binance data:', error);
+				hideLoading();
+				updateStatus('Error', 'error');
+				alert('Error loading data: ' + error.message);
+			}
+		}
+
+		// Toggle live feed
+		function toggleLiveFeed() {
+			if (isLiveMode) {
+				stopLiveFeed();
+			} else {
+				startLiveFeed();
+			}
+		}
+
+		// Start live feed
+		function startLiveFeed() {
+			const symbol = document.getElementById('symbol-select').value;
+			binanceWS = new BinanceWebSocket(symbol);
+			
+			binanceWS.connect((trade) => {
+				// Add to buffer
+				tradeBuffer.push(trade);
+				
+				// Keep buffer size manageable
+				if (tradeBuffer.length > 10000) {
+					tradeBuffer = tradeBuffer.slice(-5000);
+				}
+
+				// Add to live trades display
+				addLiveTrade(trade);
+
+				// Update profile every 50 trades
+				if (tradeBuffer.length % 50 === 0) {
+					updateVolumeProfile();
+				}
+			});
+
+			isLiveMode = true;
+			document.getElementById('toggle-live').textContent = 'Stop Live Feed';
+			document.getElementById('toggle-live').classList.remove('secondary');
+			document.getElementById('toggle-live').classList.add('danger');
+			updateStatus('Live Streaming', 'connected');
+		}
+
+		// Stop live feed
+		function stopLiveFeed() {
+			if (binanceWS) {
+				binanceWS.disconnect();
+				binanceWS = null;
+			}
+			isLiveMode = false;
+			document.getElementById('toggle-live').textContent = 'Start Live Feed';
+			document.getElementById('toggle-live').classList.remove('danger');
+			document.getElementById('toggle-live').classList.add('secondary');
+			updateStatus('Connected', 'connected');
+		}
+
+		// Update volume profile with latest trades
+		function updateVolumeProfile() {
+			const numLevels = parseInt(document.getElementById('price-levels').value);
+			const separateBuySell = document.getElementById('display-mode').value === 'separated';
+
+			chart.clearVolumeProfiles();
+			chart.addVolumeProfileFromTrades(tradeBuffer, {
+				numPriceLevels: numLevels,
+				separateBuySell: separateBuySell,
+			});
+		}
+
+		// Add live trade to display
+		function addLiveTrade(trade) {
+			liveTradesList.unshift(trade);
+			if (liveTradesList.length > MAX_LIVE_TRADES_DISPLAY) {
+				liveTradesList = liveTradesList.slice(0, MAX_LIVE_TRADES_DISPLAY);
+			}
+
+			const container = document.getElementById('live-trades-list');
+			container.innerHTML = liveTradesList.map(t => `
+				<div class="trade-item ${t.side}">
+					<span class="trade-price ${t.side === 'buy' ? 'positive' : 'negative'}">
+						$${t.price.toFixed(2)}
+					</span>
+					<span class="trade-volume">${t.volume.toFixed(4)}</span>
+				</div>
+			`).join('');
+		}
+
+		// Update metrics display
+		function updateMetrics(metrics) {
+			const metricsDiv = document.getElementById('metrics');
+			const priceChangeClass = metrics.priceChange >= 0 ? 'positive' : 'negative';
+			
+			metricsDiv.innerHTML = `
+				<div class="metric-card">
+					<div class="metric-label">Current Price</div>
+					<div class="metric-value price-value">$${metrics.currentPrice.toLocaleString()}</div>
+					<div class="metric-subtext ${priceChangeClass}">
+						${metrics.priceChange >= 0 ? '+' : ''}${metrics.priceChangePercent.toFixed(2)}%
+					</div>
+				</div>
+
+				<div class="metric-card">
+					<div class="metric-label">24h High / Low</div>
+					<div class="metric-value" style="font-size: 16px;">
+						${metrics.high24h?.toLocaleString() || 'N/A'}
+					</div>
+					<div class="metric-subtext">
+						${metrics.low24h?.toLocaleString() || 'N/A'}
+					</div>
+				</div>
+
+				<div class="metric-card">
+					<div class="metric-label">Point of Control</div>
+					<div class="metric-value">$${metrics.poc?.toLocaleString() || 'N/A'}</div>
+				</div>
+
+				<div class="metric-card">
+					<div class="metric-label">Value Area High</div>
+					<div class="metric-value">$${metrics.valueAreaHigh?.toLocaleString() || 'N/A'}</div>
+				</div>
+
+				<div class="metric-card">
+					<div class="metric-label">Value Area Low</div>
+					<div class="metric-value">$${metrics.valueAreaLow?.toLocaleString() || 'N/A'}</div>
+				</div>
+
+				<div class="metric-card">
+					<div class="metric-label">Total Trades</div>
+					<div class="metric-value">${metrics.totalTrades.toLocaleString()}</div>
+				</div>
+
+				<div class="metric-card">
+					<div class="metric-label">Total Volume</div>
+					<div class="metric-value">${metrics.totalVolume.toFixed(2)}</div>
+					<div class="metric-subtext">BTC</div>
+				</div>
+
+				<div class="metric-card">
+					<div class="metric-label">24h Volume</div>
+					<div class="metric-value">${metrics.volume24h?.toFixed(0).toLocaleString() || 'N/A'}</div>
+					<div class="metric-subtext">BTC</div>
+				</div>
+			`;
+		}
+
+		// UI helpers
+		function showLoading(text) {
+			document.getElementById('loading-text').textContent = text;
+			document.getElementById('loading-overlay').style.display = 'flex';
+		}
+
+		function hideLoading() {
+			document.getElementById('loading-overlay').style.display = 'none';
+		}
+
+		function updateStatus(text, status) {
+			document.getElementById('status-text').textContent = text;
+			const dot = document.getElementById('status-dot');
+			dot.className = 'status-dot';
+			if (status === 'connected') {
+				dot.classList.add('connected');
+			} else if (status === 'loading') {
+				dot.classList.add('loading');
+			}
+		}
+
+		// Event listeners
+		document.getElementById('load-data').addEventListener('click', loadBinanceData);
+		document.getElementById('toggle-live').addEventListener('click', toggleLiveFeed);
+		document.getElementById('clear-chart').addEventListener('click', () => {
+			chart.clearVolumeProfiles();
+			tradeBuffer = [];
+			liveTradesList = [];
+			document.getElementById('live-trades-list').innerHTML = '';
+		});
+
+		// Reload data when settings change
+		document.getElementById('symbol-select').addEventListener('change', () => {
+			if (isLiveMode) stopLiveFeed();
+			loadBinanceData();
+		});
+
+		document.getElementById('time-range').addEventListener('change', loadBinanceData);
+
+		// Initialize on load
+		init();
+	</script>
+</body>
+</html>
+

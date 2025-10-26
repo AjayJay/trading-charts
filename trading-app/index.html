@@ -117,6 +117,10 @@
         background: linear-gradient(135deg, #787b86 0%, #5a5d6b 100%);
       }
 
+      .feature-card:nth-child(2) .feature-icon {
+        background: linear-gradient(135deg, #f0b90b 0%, #f7931a 100%);
+      }
+
       .feature-title {
         font-size: 20px;
         font-weight: 600;
@@ -197,14 +201,14 @@
           <span class="feature-status status-live">● Live</span>
         </div>
 
-        <!-- Volume Profile (Coming Soon) -->
-        <div class="feature-card coming-soon disabled">
-          <div class="feature-icon">📊</div>
-          <div class="feature-title">Volume Profile</div>
+        <!-- Volume Profile -->
+        <div class="feature-card" onclick="window.location.href='src/features/orderflow/index.html'">
+          <div class="feature-icon">⚡</div>
+          <div class="feature-title">Volume Profile - Order Flow</div>
           <div class="feature-description">
-            Analyze volume distribution at different price levels to identify key support and resistance zones.
+            Live Binance BTC volume profile with real-time order flow analysis. View volume distribution at price levels, POC, Value Area, and streaming trades.
           </div>
-          <span class="feature-status status-coming-soon">Coming Soon</span>
+          <span class="feature-status status-live">● Live</span>
         </div>
 
         <!-- Order Flow (Coming Soon) -->
